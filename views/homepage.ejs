@@ -24,7 +24,7 @@
               <li draggable="true" class="task-item" data-id="<%= task.id%>">
                 <label>
                   <input type="checkbox" name="taskIds" value="<%= task.id %>">
-                  <%= task.taskName %> - Deadline: <%= task.deadline.toISOString().slice(0, 16).replace('T', ' ') %>
+                  <%= task.taskName %> \n Deadline: <%= task.deadline.toLocaleString() %> - Description: <%= task.description %>
                 </label>
                 <button type="button" id="modify-btn-<%= task.id %>" onclick="showModifyForm('<%= task.id%>')">Modify Task</button>
               </li>

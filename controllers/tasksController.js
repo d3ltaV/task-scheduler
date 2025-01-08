@@ -27,33 +27,114 @@ exports.addTask = async (req, res) => {
     let { taskName, description, deadline, reminderType, reminderTime, reminderInterval } = req.body;
     const userId = req.session.userId;
     try {
-        let deadlineDate = new Date(deadline);
+        // Store dates as ISO strings to preserve timezone
+        const deadlineDate = deadline ? new Date(deadline).toISOString() : null;
+        let reminderTimeDate;
+
         if (reminderType === 'multi-time') {
-            reminderInterval = reminderInterval ? reminderInterval : 60;
+            reminderInterval = reminderInterval || 60;
             if (!reminderTime) {
-                const reminderDate = new Date(deadlineDate);
-                reminderDate.setMinutes(reminderDate.getMinutes() - 60);
-                reminderTime = reminderDate;
+                reminderTimeDate = new Date(deadlineDate);
+                reminderTimeDate.setMinutes(reminderTimeDate.getMinutes() - 60);
+                reminderTimeDate = reminderTimeDate.toISOString();
+            } else {
+                reminderTimeDate = new Date(reminderTime).toISOString();
             }
         } else {
             if (!reminderTime) {
-                const reminderDate = new Date(deadlineDate);
-                reminderDate.setMinutes(reminderDate.getMinutes() - 60);
-                reminderTime = reminderDate;
+                reminderTimeDate = new Date(deadlineDate);
+                reminderTimeDate.setMinutes(reminderTimeDate.getMinutes() - 60);
+                reminderTimeDate = reminderTimeDate.toISOString();
+            } else {
+                reminderTimeDate = new Date(reminderTime).toISOString();
             }
         }
+
         const maxPositionTask = await Tasks.findOne({
             where: { userId },
             order: [['position', 'DESC']],
         });
         const newPosition = maxPositionTask ? maxPositionTask.position + 1 : 0;
-        const newTask = await Tasks.create({taskName, deadline, description, reminderType, reminderTime, reminderInterval : reminderInterval ? reminderInterval :null, userId, position : newPosition});
+        
+        const newTask = await Tasks.create({
+            taskName,
+            deadline: deadlineDate,
+            description,
+            reminderType,
+            reminderTime: reminderTimeDate,
+            reminderInterval: reminderInterval || null,
+            userId,
+            position: newPosition
+        });
+
         notifs.scheduleNotification(newTask);
         res.redirect('/tasks/homepage');
     } catch (error) {
         res.status(400).json({error:'Task creation failed'});
     }
 };
+
+exports.modifyTask = async(req, res) => {
+    if (!isAuthenticated(req)) {
+        return res.status(401).json({error : 'Please login!'});
+    }
+    const userId = req.session.userId;
+    const taskId = req.body.taskId;
+    try {
+        const task = await Tasks.findOne({
+            where: {
+                id: taskId,
+                userId: userId
+            }
+        });
+
+        if (!task) {
+            return res.status(404).json({ error: 'Task not found' });
+        }
+
+        await notifs.cancel(task.id);
+
+        const { taskName, deadline, description, reminderType, reminderTime, reminderInterval } = req.body;
+        
+        // Preserve timezone by storing as ISO string
+        const newDeadline = deadline ? new Date(deadline).toISOString() : task.deadline;
+        let newReminderTime = reminderTime ? new Date(reminderTime).toISOString() : task.reminderTime;
+        
+        if (!reminderTime && deadline) {
+            const tempDate = new Date(newDeadline);
+            tempDate.setMinutes(tempDate.getMinutes() - 60);
+            newReminderTime = tempDate.toISOString();
+        }
+
+        const updates = {
+            taskName: taskName || task.taskName,
+            deadline: newDeadline,
+            description: description || task.description,
+            reminderType: reminderType || task.reminderType,
+            reminderTime: newReminderTime,
+            reminderInterval: null
+        };
+
+        if (updates.reminderType === 'multi-time') {
+            updates.reminderInterval = reminderInterval || 60;
+        }
+
+        await task.update(updates);
+        
+        const updatedTask = await Tasks.findOne({
+            where: {
+                id: taskId,
+                userId: userId
+            }
+        });
+
+        await notifs.scheduleNotification(updatedTask);
+        res.redirect('/tasks/homepage');
+    } catch (error) {
+        res.status(400).json({ error: 'Failed to modify task', details: error.message });
+    }
+};
+
 exports.deleteTask = async(req, res) => {
     if (!isAuthenticated(req)) {
         return res.status(401).json({ error: 'Please login!' });
@@ -109,75 +190,6 @@ exports.reinitialize = async (req, res) => { //for initial login
       res.status(500).json({ error: 'Failed to reinitialize tasks' });
     }
 };
-exports.modifyTask = async(req, res) => {
-    if (!isAuthenticated(req)) {
-        return res.status(401).json({error : 'Please login!'});
-    }
-    const userId = req.session.userId;
-    const taskId = req.body.taskId;
-    try {
-        const task = await Tasks.findOne({
-            where: {
-                id: taskId,
-                userId: userId
-            }
-        });
-
-        if (!task) {
-            return res.status(404).json({ error: 'Task not found' });
-        }
-
-        // Cancel existing notifications before modifying
-        await notifs.cancel(task.id);
-
-        const { taskName, deadline, description, reminderType, reminderTime, reminderInterval } = req.body;
-        
-        // Handle deadline and reminder time calculations
-        const newDeadline = deadline ? new Date(deadline) : task.deadline;
-        let newReminderTime = reminderTime ? new Date(reminderTime) : task.reminderTime;
-        
-        // If reminder time isn't provided but deadline changed, adjust default reminder
-        if (!reminderTime && deadline) {
-            newReminderTime = new Date(newDeadline);
-            newReminderTime.setMinutes(newReminderTime.getMinutes() - 60);
-        }
-
-        // Update task properties
-        const updates = {
-            taskName: taskName || task.taskName,
-            deadline: newDeadline,
-            description: description || task.description,
-            reminderType: reminderType || task.reminderType,
-            reminderTime: newReminderTime,
-            reminderInterval: null
-        };
-
-        if (updates.reminderType === 'multi-time') {
-            updates.reminderInterval = reminderInterval || 60;
-        }
-
-        // Update the task
-        await task.update(updates);
-        
-        // Schedule new notification with updated properties
-        const updatedTask = await Tasks.findOne({
-            where: {
-                id: taskId,
-                userId: userId
-            }
-        });
-
-        await notifs.scheduleNotification(updatedTask);
-        
-        console.log('Task updated and notification rescheduled:', updatedTask);
-        res.redirect('/tasks/homepage');
-    } catch (error) {
-        console.error('Error modifying task:', error);
-        res.status(400).json({ error: 'Failed to modify task', details: error.message });
-    }
-};
-
-
 // exports.modifyTask = async(req, res) => {
 //     if (!isAuthenticated(req)) {
 //         return res.status(401).json({error : 'Please login!'});
@@ -185,28 +197,64 @@ exports.modifyTask = async(req, res) => {
 //     const userId = req.session.userId;
 //     const taskId = req.body.taskId;
 //     try {
-//         const task = await Tasks.findOne({where : {
-//             id: taskId,
-//             userId: userId
-//         }});
-//         await notifs.cancel(task.id);
-//         const { taskName, deadline, description, reminderType, reminderTime, reminderInterval } = req.body;
-//         console.log(reminderInterval);
-//         if (taskName !== undefined) task.taskName = taskName;
-//         if (deadline !== undefined) task.deadline = deadline;
-//         if (description !== undefined) task.description = description;
-//         if (reminderType !== undefined) task.reminderType = reminderType;
-//         if (reminderTime !== undefined) task.reminderTime = reminderTime;
-//         if (reminderType === 'multi-time') {
-//             task.reminderInterval = reminderInterval || 60; 
-//         } else {
-//             task.reminderInterval = null; 
+//         const task = await Tasks.findOne({
+//             where: {
+//                 id: taskId,
+//                 userId: userId
+//             }
+//         });
+
+//         if (!task) {
+//             return res.status(404).json({ error: 'Task not found' });
 //         }
-//         await task.save();
-//         console.log(task);
-//         await notifs.scheduleNotification(task);
+
+//         // Cancel existing notifications before modifying
+//         await notifs.cancel(task.id);
+
+//         const { taskName, deadline, description, reminderType, reminderTime, reminderInterval } = req.body;
+        
+//         // Handle deadline and reminder time calculations
+//         const newDeadline = deadline ? new Date(deadline) : task.deadline;
+//         let newReminderTime = reminderTime ? new Date(reminderTime) : task.reminderTime;
+        
+//         // If reminder time isn't provided but deadline changed, adjust default reminder
+//         if (!reminderTime && deadline) {
+//             newReminderTime = new Date(newDeadline);
+//             newReminderTime.setMinutes(newReminderTime.getMinutes() - 60);
+//         }
+
+//         // Update task properties
+//         const updates = {
+//             taskName: taskName || task.taskName,
+//             deadline: newDeadline,
+//             description: description || task.description,
+//             reminderType: reminderType || task.reminderType,
+//             reminderTime: newReminderTime,
+//             reminderInterval: null
+//         };
+
+//         if (updates.reminderType === 'multi-time') {
+//             updates.reminderInterval = reminderInterval || 60;
+//         }
+
+//         // Update the task
+//         await task.update(updates);
+        
+//         // Schedule new notification with updated properties
+//         const updatedTask = await Tasks.findOne({
+//             where: {
+//                 id: taskId,
+//                 userId: userId
+//             }
+//         });
+
+//         await notifs.scheduleNotification(updatedTask);
+        
+//         console.log('Task updated and notification rescheduled:', updatedTask);
 //         res.redirect('/tasks/homepage');
 //     } catch (error) {
+//         console.error('Error modifying task:', error);
 //         res.status(400).json({ error: 'Failed to modify task', details: error.message });
 //     }
 // };
+

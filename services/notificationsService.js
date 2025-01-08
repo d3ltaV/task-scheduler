@@ -96,22 +96,7 @@ async function scheduleNotification(task) {
         throw error;
     }
 }
-// async function scheduleNotification(task) {
-//     try {
-//         if (new Date() >= new Date(task.deadline)) {
-//             console.log(`Task ${task.id} has passed deadline, not scheduling notification`);
-//             return;
-//         }
 
-//         if (task.reminderType === "one-time") {
-//             await scheduleOneNotification(task.reminderTime, task, task.deadline);
-//         } else {
-//             await scheduleMultiNotification(task.reminderTime, task, task.deadline, task.reminderInterval);
-//         }
-//     } catch (error) {
-//         console.error(`Error scheduling notification for task ${task.id}:`, error);
-//     }
-// }
 
 async function scheduleOneNotification(reminderDate, task, deadline) {
     const now = new Date();
@@ -145,7 +130,7 @@ async function scheduleMultiNotification(reminderDate, task, deadline, reminderI
     const intervalMs = reminderInterval * 60000;
 
     if (now < startDate) {
-        const waitTime = startDate - now;
+        const waitTime = startDate.getTime() - now.getTime();
         const timeout = setTimeout(async () => {
             await sendNotification(task.userId, task);
             startRecurringNotifications(task, deadlineDate, intervalMs);
@@ -158,7 +143,7 @@ async function scheduleMultiNotification(reminderDate, task, deadline, reminderI
             createdAt: Date.now()
         });
     } else {
-        const timeSinceStart = now - startDate;
+        const timeSinceStart = now .getTime() - startDate.getTime();
         const timeUntilNextNotification = intervalMs - (timeSinceStart % intervalMs);
         
         setTimeout(async () => {
