@@ -1,0 +1,112 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- <link rel="stylesheet" type="text/css" href="../styles/home-styles.css">  -->
+    <title>Task Homepage</title>
+    <script>
+        const userId = "<%= userId %>";
+        window.publicVapidKey = "<%= publicVapidKey %>";
+    </script>
+    <script src="/notification.js"></script>
+    <script src="/homepageScript.js"></script>
+  
+</head>
+<body>
+    <h1>Your Tasks</h1>
+    <button id="subscribeButton">Subscribe to Notifications</button>
+
+    <form action="/tasks/delete" method="POST">
+        <ul id="task-list">
+            <% tasks.forEach(task => { %>
+              <li draggable="true" class="task-item" data-id="<%= task.id%>">
+                <label>
+                  <input type="checkbox" name="taskIds" value="<%= task.id %>">
+                  <%= task.taskName %> - Deadline: <%= task.deadline.toISOString().slice(0, 16).replace('T', ' ') %>
+                </label>
+                <button type="button" id="modify-btn-<%= task.id %>" onclick="showModifyForm('<%= task.id%>')">Modify Task</button>
+              </li>
+            <% }) %>
+          </ul>
+        <button type="submit">Delete Selected Tasks</button>
+    </form>
+    <% tasks.forEach(task => { %>
+        <form action="/tasks/modify" method="POST" id="modify-task-form-<%= task.id %>" style="display:none;">
+          <input type="hidden" name="taskId" value="<%= task.id %>">
+      
+          <label for="taskName-<%= task.id %>">Task Name:</label>
+          <input type="text" id="taskName-<%= task.id %>" name="taskName" value="<%= task.taskName %>" required>
+      
+          <label for="deadline-<%= task.id %>">Deadline:</label>
+          <input 
+            type="datetime-local" 
+            id="deadline-<%= task.id %>" 
+            name="deadline" 
+            value="<%= task.deadline.toISOString().slice(0, 16) %>" 
+            required>
+      
+          <label for="description-<%= task.id %>">Description:</label>
+          <input 
+            type="text" 
+            id="description-<%= task.id %>" 
+            name="description" 
+            value="<%= task.description %>" 
+            required>
+      
+          <label for="reminderType-<%= task.id %>">Reminder Type:</label>
+          <select id="reminderType-<%= task.id %>" name="reminderType" required>
+            <option value="one-time" <% if (task.reminderType === 'one-time') { %> selected <% } %>>One-time</option>
+            <option value="multi-time" <% if (task.reminderType === 'multi-time') { %> selected <% } %>>Multi-time</option>
+          </select>
+      
+          <label for="reminderTime-<%= task.id %>">Reminder Time:</label>
+          <input 
+            type="datetime-local" 
+            id="reminderTime-<%= task.id %>" 
+            name="reminderTime" 
+            value="<%= task.reminderTime.toISOString().slice(0, 16) %>" 
+            required>
+      
+          <label for="reminderInterval-<%= task.id %>">Reminder Interval (in minutes):</label>
+          <input 
+            type="number" 
+            id="reminderInterval-<%= task.id %>" 
+            name="reminderInterval" 
+            value="<%= task.reminderInterval %>" >
+      
+          <button type="submit" id="save-btn-<%= task.id %>">Save Modifications</button>
+          <button type="button" onclick="hideModifyForm('<%= task.id %>')">Cancel</button>
+        </form>
+      <% }) %>
+      
+    <h2>Add a New Task</h2>
+    <form action="/tasks/add" method="POST">
+        <label for="taskName-new">Task Name:</label>
+        <input type="text" id="taskName-new" name="taskName" required>
+        
+        <label for="deadline-new">Deadline:</label>
+        <input type="datetime-local" id="deadline-new" name="deadline" required>
+        
+        <label for="description-new">Description</label>
+        <input type="text" id="description-new" name="description" required>
+
+        <label for="reminderType-new">Reminder Type:</label>
+        <select id="reminderType-new" name="reminderType" required>
+            <option value="one-time">One-time</option>
+            <option value="multi-time">Multi-time</option>
+        </select>
+
+        <label for="reminderTime-new">Reminder Time:</label>
+        <input type="datetime-local" id="reminderTime-new" name="reminderTime" required>
+
+        <label for="reminderInterval-new">Reminder Interval (in minutes):</label>
+        <input type="number" id="reminderInterval-new" name="reminderInterval">
+
+        <button type="submit">Add Task</button>
+    </form>
+
+    <a href="/accounts/logout">Logout</a>
+</body>
+</html>
