@@ -127,57 +127,77 @@ async function scheduleMultiNotification(reminderDate, task, deadline, reminderI
         return;
     }
 
+    //Clear any existing jobs for this task
+    await cancel(task.id);
+
     const intervalMs = reminderInterval * 60000;
 
+    // Calculate the next notification time
+    let nextNotificationTime;
     if (now < startDate) {
-        const waitTime = startDate.getTime() - now.getTime();
-        const timeout = setTimeout(async () => {
-            await sendNotification(task.userId, task);
-            startRecurringNotifications(task, deadlineDate, intervalMs);
-        }, waitTime);
-
-        activeJobs.set(task.id, {
-            type: 'timeout',
-            job: timeout,
-            taskName: task.taskName,
-            createdAt: Date.now()
-        });
+        nextNotificationTime = startDate;
     } else {
-        const timeSinceStart = now .getTime() - startDate.getTime();
-        const timeUntilNextNotification = intervalMs - (timeSinceStart % intervalMs);
+        //If we're past the start date, calculate the next interval
+        const timeSinceStart = now.getTime() - startDate.getTime();
+        const intervalsElapsed = Math.ceil(timeSinceStart / intervalMs);
+        nextNotificationTime = new Date(startDate.getTime() + (intervalsElapsed * intervalMs));
         
-        setTimeout(async () => {
-            await sendNotification(task.userId, task);
-            startRecurringNotifications(task, deadlineDate, intervalMs);
-        }, timeUntilNextNotification);
-    }
-}
-
-function startRecurringNotifications(task, deadlineDate, intervalMs) {
-    const interval = setInterval(async () => {
-        const now = new Date();
-        if (now < deadlineDate) {
-            const taskExists = await Tasks.findOne({ where: { id: task.id, userId: task.userId } });
-            if (taskExists) {
-                await sendNotification(task.userId, task);
-            } else {
-                clearInterval(interval);
-                activeJobs.delete(task.id);
-            }
-        } else {
-            clearInterval(interval);
-            activeJobs.delete(task.id);
+        //If the next calculated time is in the past, move to the next interval
+        if (nextNotificationTime <= now) {
+            nextNotificationTime = new Date(nextNotificationTime.getTime() + intervalMs);
         }
-    }, intervalMs);
+    }
+
+    if (nextNotificationTime >= deadlineDate) {
+        console.log(`Next notification would be after deadline for task ${task.id}, not scheduling.`);
+        return;
+    }
+
+    // Schedule initial timeout to start the notifications
+    const initialWaitTime = nextNotificationTime.getTime() - now.getTime();
+    const timeout = setTimeout(() => {
+        sendNotification(task.userId, task).then(() => {
+            const interval = setInterval(async () => {
+                const currentTime = new Date();
+                if (currentTime >= deadlineDate) {
+                    clearInterval(interval);
+                    activeJobs.delete(task.id);
+                    return;
+                }
+
+                const taskExists = await Tasks.findOne({ 
+                    where: { id: task.id, userId: task.userId } 
+                });
+                
+                if (!taskExists) {
+                    clearInterval(interval);
+                    activeJobs.delete(task.id);
+                    return;
+                }
+
+                await sendNotification(task.userId, task);
+            }, intervalMs);
+            activeJobs.set(task.id, {
+                type: 'interval',
+                job: interval,
+                taskName: task.taskName,
+                createdAt: Date.now()
+            });
+        });
+    }, initialWaitTime);
 
     activeJobs.set(task.id, {
-        type: 'interval',
-        job: interval,
+        type: 'timeout',
+        job: timeout,
         taskName: task.taskName,
         createdAt: Date.now()
     });
-}
 
+    console.log(`Scheduled multi-time notifications for task ${task.id}:
+        Start time: ${nextNotificationTime}
+        Interval: ${reminderInterval} minutes
+        Deadline: ${deadlineDate}`);
+}
 async function cancel(taskId) {
     console.log(`Attempting to cancel notifications for task ${taskId}`);
     const numericTaskId = Number(taskId);
@@ -202,12 +222,12 @@ async function cancel(taskId) {
             console.log(`Successfully cancelled notifications for task ${taskId}`);
         } catch (error) {
             console.error(`Error cancelling job for task ${taskId}:`, error);
+            activeJobs.delete(numericTaskId);
         }
     } else {
         console.log(`No active job found for task ${taskId}`);
     }
 }
-
 function convertCronTime(date) {
     const minutes = date.getMinutes();
     const hours = date.getHours();
@@ -215,5 +235,6 @@ function convertCronTime(date) {
     const month = date.getMonth() + 1;
     return `${minutes} ${hours} ${day} ${month} *`;
 }
+
 
 module.exports = { scheduleNotification, cancel, activeJobs };

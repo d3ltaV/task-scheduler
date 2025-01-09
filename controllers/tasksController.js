@@ -74,7 +74,10 @@ exports.addTask = async (req, res) => {
     }
 };
 
+
 exports.modifyTask = async(req, res) => {
+    //modifying multi-time ones interval time/start date (?) breaks it. it calculates fmor the start and sends too many notificaitons, and it also sends a notificatoin from the refresh time + interval
+    
     if (!isAuthenticated(req)) {
         return res.status(401).json({error : 'Please login!'});
     }
