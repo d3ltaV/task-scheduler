@@ -2,27 +2,27 @@ const bcrypt = require('bcrypt');
 const webpush = require('web-push');
 const Users = require('../models/users');
 const Subscriptions = require('../models/subscriptions');
-const publicVapidKey = process.env.PUBLIC_VAPID_KEY;
-const privateVapidKey = process.env.PRIVATE_VAPID_KEY;
+// const publicVapidKey = process.env.PUBLIC_VAPID_KEY;
+// const privateVapidKey = process.env.PRIVATE_VAPID_KEY;
 
-webpush.setVapidDetails(
-  'mailto:joellejingyaoyang@gmail.com',
-  publicVapidKey,
-  privateVapidKey
-);
+// webpush.setVapidDetails(
+//   'mailto:joellejingyaoyang@gmail.com',
+//   publicVapidKey,
+//   privateVapidKey
+// );
 
 exports.showRegisterForm = async (req, res) => {
-    const subscriptionRecord = await Subscriptions.findOne({ where: { userId: req.user.id } });
-    if (subscriptionRecord) {
-        const subscription = JSON.parse(subscriptionRecord.subscription);
-        const payload = JSON.stringify({
-            title: 'Welcome!',
-            body: 'Thanks for registering with us!'
-        });
-        webpush.sendNotification(subscription, payload)
-            .then(() => console.log('Notification sent'))
-            .catch(error => console.error('Error sending notification:', error));
-    }
+    // const subscriptionRecord = await Subscriptions.findOne({ where: { userId: req.user.id } });
+    // if (subscriptionRecord) {
+    //     const subscription = JSON.parse(subscriptionRecord.subscription);
+    //     const payload = JSON.stringify({
+    //         title: 'Welcome!',
+    //         body: 'Thanks for registering with us!'
+    //     });
+    //     webpush.sendNotification(subscription, payload)
+    //         .then(() => console.log('Notification sent'))
+    //         .catch(error => console.error('Error sending notification:', error));
+    // }
     res.render('register');
 };
 

@@ -6,6 +6,18 @@ const taskRoutes = require('./routes/taskRoutes');
 const accountRoutes = require('./routes/accountRoutes');
 const subscriptionRoutes = require('./routes/notificationRoutes'); // Adjust the path as necessary
 const app = express();
+const webpush = require('web-push');
+require('dotenv').config();
+
+const publicVapidKey = process.env.PUBLIC_VAPID_KEY;
+const privateVapidKey = process.env.PRIVATE_VAPID_KEY;
+
+webpush.setVapidDetails(
+    'mailto:joellejingyaoyang@gmail.com',
+    publicVapidKey,
+    privateVapidKey
+);
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));

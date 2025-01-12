@@ -7,11 +7,8 @@ function showModifyForm(taskId) {
     const dateInputs = form.querySelectorAll('input[type="datetime-local"]');
     dateInputs.forEach(input => {
         if (input.value) {
-            // Convert UTC time to local time
             const utcTime = new Date(input.value + 'Z');
-            // Adjust for local timezone
             const localTime = new Date(utcTime);
-            // Format as YYYY-MM-DDTHH:mm
             const year = localTime.getFullYear();
             const month = String(localTime.getMonth() + 1).padStart(2, '0');
             const day = String(localTime.getDate()).padStart(2, '0');

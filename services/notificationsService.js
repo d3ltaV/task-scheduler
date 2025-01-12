@@ -4,15 +4,6 @@ const webpush = require('web-push');
 const cron = require('node-cron');
 const Tasks = require('../models/tasks');
 
-const publicVapidKey = process.env.PUBLIC_VAPID_KEY;
-const privateVapidKey = process.env.PRIVATE_VAPID_KEY;
-
-webpush.setVapidDetails(
-    'mailto:joellejingyaoyang@gmail.com',
-    publicVapidKey,
-    privateVapidKey
-);
-
 const activeJobs = new Map();
 
 async function getSubscription(userId) {

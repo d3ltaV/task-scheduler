@@ -19,7 +19,7 @@ async function requestNotificationPermission() {
 }
 
 async function unsubscribeAndClearCache() {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {//check htat there were prev. sub
         console.log('Push messaging not supported');
         return;
     }
